@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:googleapis/drive/v3.dart' as drive;
+import 'package:googleapis_auth/googleapis_auth.dart' as auth;
 import 'package:company_studio/components/my_drawer.dart';
 import 'package:open_file/open_file.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -124,6 +127,26 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
 
+  Future< Map<String, List<Map<String, dynamic>>>> getCreditOrderByCustomerName( List<dynamic> filteredOrders) async {
+    Map<String, List<Map<String, dynamic>>> groupedOrders = {};
+
+    for (var order in filteredOrders) {
+      if(order['paymentType']=='Credit'){
+        String customerName = order['customerName'];
+        if (groupedOrders.containsKey(customerName)) {
+          groupedOrders[customerName]!.add(order);
+        } else {
+          groupedOrders[customerName] = [order];
+        }
+      }
+
+    }
+
+    // Convert to JSON-like structure
+    // String groupedOrdersJson = jsonEncode(groupedOrders);
+    // print(groupedOrdersJson);
+    return groupedOrders;
+  }
 
   Future<String> _generateExcel() async {
     setState(() {
@@ -134,14 +157,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
     var excel = Excel.createExcel();
 
     // Check if the sheet exists before attempting to delete it
-    Sheet sheetObject = excel['Sheet1'];
-    Sheet orderSheet = excel['Orders'];
-    Sheet salesSheet = excel['Sales'];
-    Sheet purchaseSheet = excel['Purchases'];
 
-    excel.setDefaultSheet(orderSheet.sheetName);
-    excel.unLink(sheetObject.sheetName);
-    print(excel.getDefaultSheet());
+    Sheet orderSheet = excel['Orders'];
+    Sheet purchaseSheet = excel['Purchases'];
+    Sheet salesSheet = excel['Sales'];
+    Sheet cashSalesSheet = excel['Cash Sales'];
+    Sheet creditSalesSheet = excel['Credit Sales'];
+
+
 
     print(excel.sheets);
 
@@ -160,8 +183,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
       'Rent',
       'Purchase Amount',
       'Sales Amount',
+      'Payment Type',
+      'Profits',
       'Comments',
-      'Profits'
     ];
 
     List<String> salesHeaders = [
@@ -175,6 +199,35 @@ class _OrdersScreenState extends State<OrdersScreen> {
       'Sales Rate',
       'Rent',
       'Sales Amount',
+      'Payment Type',
+    ];
+
+    List<String> creditSalesHeaders = [
+      'S.No',
+      'Date',
+      'Vehicle Number',
+      'Customer Name',
+      'Material Type',
+      'Delivery Location',
+      'Tonnage',
+      'Sales Rate',
+      'Rent',
+      'Sales Amount',
+      'Payment Type',
+    ];
+
+    List<String> cashSalesHeaders = [
+      'S.No',
+      'Date',
+      'Vehicle Number',
+      'Customer Name',
+      'Material Type',
+      'Delivery Location',
+      'Tonnage',
+      'Sales Rate',
+      'Rent',
+      'Sales Amount',
+      'Payment Type',
     ];
 
     List<String> purchaseHeaders = [
@@ -194,6 +247,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     var cellStyle = CellStyle(
       horizontalAlign: HorizontalAlign.Center,
       verticalAlign: VerticalAlign.Center,
+      bold: true,
     );
 
     // Add headers to the first row with center alignment
@@ -209,6 +263,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
       cell.cellStyle = cellStyle;
     }
 
+    for (int i = 0; i < creditSalesHeaders.length; i++) {
+      var cell = creditSalesSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      cell.value = creditSalesHeaders[i];
+      cell.cellStyle = cellStyle;
+    }
+
+    for (int i = 0; i < cashSalesHeaders.length; i++) {
+      var cell = cashSalesSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      cell.value = cashSalesHeaders[i];
+      cell.cellStyle = cellStyle;
+    }
+
     for (int i = 0; i < purchaseHeaders.length; i++) {
       var cell = purchaseSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
       cell.value = purchaseHeaders[i];
@@ -218,7 +284,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
     await Future.delayed(const Duration(seconds: 1));
 
     // Add orders data with center alignment
+    int lastCreditSerialNo = 0;
+    int lastCashSerialNo = 0;
     for (var order in _filteredSearches) {
+
       int rowIndex = _filteredSearches.indexOf(order) + 1;
 
       orderSheet.appendRow([
@@ -228,16 +297,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
         order['customerName'],
         order['materialType'],
         order['deliveryLocation'],
-        order['tonnage'],
-        order['eTonnage'],
-        order['purchaseRate'],
-        order['saleRate'],
-        order['rent'],
-        order['purchaseAmount'],
-        order['saleAmount'],
+        double.parse(order['tonnage']),
+        double.parse(order['eTonnage']),
+    int.parse(order['purchaseRate']),
+    int.parse(order['saleRate']),
+    int.parse(order['rent']),
+    int.parse(order['purchaseAmount']),
+    int.parse(order['saleAmount']),
+    order['paymentType'],
+    int.parse(calculateProfits(order['saleAmount'], order['purchaseAmount'])),
         order['description'],
-        calculateProfits(order['saleAmount'], order['purchaseAmount']),
       ]);
+
 
       salesSheet.appendRow([
         rowIndex,
@@ -246,12 +317,51 @@ class _OrdersScreenState extends State<OrdersScreen> {
         order['customerName'],
         order['materialType'],
         order['deliveryLocation'],
-        order['eTonnage'],
-        order['saleRate'],
-        order['rent'],
-        order['saleAmount'],
+        double.parse(order['eTonnage']),
+        int.parse(order['saleRate']),
+        int.parse(order['rent']),
+        int.parse(order['saleAmount']),
+        order['paymentType']
 
       ]);
+
+
+      if(order['paymentType']!='Credit'){
+        lastCashSerialNo+=1;
+        cashSalesSheet.appendRow([
+          lastCashSerialNo,
+          order['date'],
+          order['vehicleNumber'],
+          order['customerName'],
+          order['materialType'],
+          order['deliveryLocation'],
+          double.parse(order['eTonnage']),
+          int.parse(order['saleRate']),
+          int.parse(order['rent']),
+          int.parse(order['saleAmount']),
+          order['paymentType']
+
+        ]);
+      }
+      else{
+        lastCreditSerialNo+=1;
+        creditSalesSheet.appendRow([
+          lastCreditSerialNo,
+          order['date'],
+          order['vehicleNumber'],
+          order['customerName'],
+          order['materialType'],
+          order['deliveryLocation'],
+          double.parse(order['eTonnage']),
+          int.parse(order['saleRate']),
+          int.parse(order['rent']),
+          int.parse(order['saleAmount']),
+          order['paymentType']
+
+        ]);
+      }
+
+
 
       purchaseSheet.appendRow([
         rowIndex,
@@ -260,26 +370,69 @@ class _OrdersScreenState extends State<OrdersScreen> {
         order['customerName'],
         order['materialType'],
         order['deliveryLocation'],
-        order['tonnage'],
-        order['purchaseRate'],
-        order['purchaseAmount'],
+        double.parse(order['tonnage']),
+    int.parse(order['purchaseRate']),
+        int.parse(order['purchaseAmount']),
       ]);
 
 
 
-      // Center-align all cells in the row
-      for (int i = 0; i < orderHeaders.length; i++) {
-        var cell = orderSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
+      // // Center-align all cells in the row
+      // for (int i = 0; i < orderHeaders.length; i++) {
+      //   var cell = orderSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
+      //   cell.cellStyle = cellStyle;
+      // }
+      // for (int i = 0; i < salesHeaders.length; i++) {
+      //   var cell = salesSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
+      //   cell.cellStyle = cellStyle;
+      // }
+      // for (int i = 0; i < purchaseHeaders.length; i++) {
+      //   var cell = purchaseSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
+      //   cell.cellStyle = cellStyle;
+      // }
+
+    }
+
+    Map<String, List<Map<String, dynamic>>> groupedOrders  = await getCreditOrderByCustomerName(_filteredSearches);
+
+    for (var customer in groupedOrders.keys ){
+      var customerSheet = excel[customer];
+
+      for (int i = 0; i < creditSalesHeaders.length; i++) {
+        var cell = customerSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+        cell.value = creditSalesHeaders[i];
         cell.cellStyle = cellStyle;
       }
-      for (int i = 0; i < salesHeaders.length; i++) {
-        var cell = salesSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
-        cell.cellStyle = cellStyle;
+      var rowIndex = 0;
+      for (var order in groupedOrders[customer]!){
+        rowIndex+=1 ;
+        customerSheet.appendRow([
+          rowIndex,
+          order['date'],
+          order['vehicleNumber'],
+          order['customerName'],
+          order['materialType'],
+          order['deliveryLocation'],
+          double.parse(order['eTonnage']),
+          int.parse(order['saleRate']),
+          int.parse(order['rent']),
+          int.parse(order['saleAmount']),
+          order['paymentType']
+
+        ]);
       }
-      for (int i = 0; i < purchaseHeaders.length; i++) {
-        var cell = purchaseSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
-        cell.cellStyle = cellStyle;
+
+      for (int i = 0; i < creditSalesHeaders.length; i++) {
+        int maxLength = creditSalesHeaders[i].length;
+        for (var row in customerSheet.rows) {
+          String cellValue = row[i]?.value?.toString() ?? '';
+          if (cellValue.length > maxLength) {
+            maxLength = cellValue.length;
+          }
+        }
+        customerSheet.setColWidth(i, maxLength.toDouble() + 5.0); // Adjust column width
       }
+
 
     }
 
@@ -305,6 +458,30 @@ class _OrdersScreenState extends State<OrdersScreen> {
       }
       salesSheet.setColWidth(i, maxLength.toDouble() + 5.0); // Adjust column width
     }
+
+    for (int i = 0; i < creditSalesHeaders.length; i++) {
+      int maxLength = creditSalesHeaders[i].length;
+      for (var row in creditSalesSheet.rows) {
+        String cellValue = row[i]?.value?.toString() ?? '';
+        if (cellValue.length > maxLength) {
+          maxLength = cellValue.length;
+        }
+      }
+      creditSalesSheet.setColWidth(i, maxLength.toDouble() + 5.0); // Adjust column width
+    }
+
+    for (int i = 0; i < cashSalesHeaders.length; i++) {
+      int maxLength = cashSalesHeaders[i].length;
+      for (var row in cashSalesSheet.rows) {
+        String cellValue = row[i]?.value?.toString() ?? '';
+        if (cellValue.length > maxLength) {
+          maxLength = cellValue.length;
+        }
+      }
+      cashSalesSheet.setColWidth(i, maxLength.toDouble() + 5.0); // Adjust column width
+    }
+
+
     for (int i = 0; i < purchaseHeaders.length; i++) {
       int maxLength = purchaseHeaders[i].length;
       for (var row in purchaseSheet.rows) {
@@ -396,6 +573,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
       print('Excel file downloaded to: $downloadPath');
     }
   }
+
+
 
   Future<void> _sendEmail() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -497,9 +676,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
       // Filter orders based on the date range
       _filteredSearches = allOrders.where((order) {
         final orderDate = _dateFormatter.parse(order['date']);
-        return (orderDate.isAtSameMomentAs(_dateFormatter.parse(formattedStartDate)) || orderDate.isAtSameMomentAs(_dateFormatter.parse(formattedEndDate))) || (
+        final isThatOrder =  (orderDate.isAtSameMomentAs(_dateFormatter.parse(formattedStartDate)) || orderDate.isAtSameMomentAs(_dateFormatter.parse(formattedEndDate))) || (
             orderDate.isAfter(_dateFormatter.parse(formattedStartDate)) &&
             orderDate.isBefore(_dateFormatter.parse(formattedEndDate)));
+
+        order['paymentType'] = order.containsKey('paymentType') ? order['paymentType'] : 'Credit';
+        return isThatOrder;
+
       }).toList();
 
       await Future.delayed(const Duration(seconds: 1));
@@ -545,143 +728,32 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       // appBar: AppBar(
-      //   title: const Text('All Recorded Orders', style: TextStyle(color: Colors.black,fontWeight: FontWeight.w600,)),
+      //   title: const Text('All Recorded Orders', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600)),
       //   backgroundColor: Colors.white,
       // ),
-      body: Stack(
+      body: Column(
         children: [
-          _isLoading && _reportGenerated==false ?
-          Center(child: CircularProgressIndicator())
-              : Padding(
-            padding: const EdgeInsets.fromLTRB(0,250,0,10),
-            child:  ListView.builder(
-              itemCount: _filteredSearches.length,
-              itemBuilder: (context, index) {
-                final order = _filteredSearches[index];
-                return Card(
-
-                  color: Colors.white,
-                  margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-                  elevation: 5,
-                  child:
-                   ListTile(
-                    contentPadding: const EdgeInsets.all(16.0),
-                    title: RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: '# ${index+1}\n\n',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              color: Colors.black,
-                            ),
-                          ),
-                          TextSpan(
-                            text: '${order['customerName']}\n',
-                            style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold),
-                          ),
-                          TextSpan(
-                            text: '${order['date']}\n',
-                            style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.black,
-                                fontWeight: FontWeight.w400),
-                          ),
-                          TextSpan(
-                            text: '${order['vehicleNumber']}\n',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.black,
-                              fontWeight: FontWeight.w900
-                            ),
-                          ),
-                          TextSpan(
-                            text: '${order['materialType']} - T (${order['tonnage']}) - eT (${order['eTonnage']})',
-                            style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.black,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () {
-                            Navigator.pushNamed(context, '/home', arguments: order);
-                          },
+          // Top Card with Filters and Buttons
+          Card(
+            color: Colors.white,
+            elevation: 4.0,
+            margin: const EdgeInsets.all(7.0),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.yellow,
+                          foregroundColor: Colors.black,
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (BuildContext context) {
-                                return AlertDialog(
-                                  title: const Text('Delete Order'),
-                                  content: const Text('Are you sure you want to delete this order?'),
-                                  actions: <Widget>[
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.of(context).pop();
-                                        setState(() {
-                                          deleteOrder(index);
-                                        });
-                                      },
-                                      child: const Text('Delete'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.of(context).pop();
-                                      },
-                                      child: const Text('Cancel'),
-                                    ),
-                                  ],
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Card(
-              color: Colors.white,
-              elevation: 4.0,
-              margin: EdgeInsets.all(7.0),
-
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  children: [
-                    Row (
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        SizedBox(width:0.0),
-                        ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.yellow, // Set the background color to yellow
-                              foregroundColor: Colors.black,  // Set the text color to black
-                            ),
-                          onPressed: () async {
-
+                        onPressed: () async {
                           final DateTime? startPicker = await showDatePicker(
                             context: context,
                             initialDate: _startDate ?? DateTime.now(),
@@ -693,13 +765,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               _startDate = startPicker;
                             });
                           }
-                        } , child: _startDate!=null ? Text(_dateFormatter.format(_startDate!).toString().split(' ')[0]) : const Text("Start Date")),
-                        SizedBox(width: 60.0),
-                        ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.yellow, // Set the background color to yellow
-                              foregroundColor: Colors.black,  // Set the text color to black
-                            ),onPressed: () async {
+                        },
+                        child: _startDate != null
+                            ? Text(_dateFormatter.format(_startDate!).split(' ')[0])
+                            : const Text("Start Date"),
+                      ),
+                      const SizedBox(width: 60.0),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.yellow,
+                          foregroundColor: Colors.black,
+                        ),
+                        onPressed: () async {
                           final DateTime? endPicker = await showDatePicker(
                             context: context,
                             initialDate: _endDate ?? DateTime.now(),
@@ -711,138 +788,220 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               _endDate = endPicker;
                             });
                           }
-                        } , child: _endDate !=null ? Text(_dateFormatter.format(_endDate!).toString().split(' ')[0]) : const Text("End Date")),
-
-                      ],
+                        },
+                        child: _endDate != null
+                            ? Text(_dateFormatter.format(_endDate!).split(' ')[0])
+                            : const Text("End Date"),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16.0),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton(
+                        style: ButtonStyle(
+                          backgroundColor:
+                          MaterialStateProperty.all(Colors.green),
+                          foregroundColor:
+                          MaterialStateProperty.all(Colors.white),
+                        ),
+                        onPressed: _generateExcel,
+                        child: const Icon(Icons.file_download),
+                      ),
+                      ElevatedButton(
+                        style: ButtonStyle(
+                          backgroundColor:
+                          MaterialStateProperty.all(Colors.redAccent),
+                          foregroundColor:
+                          MaterialStateProperty.all(Colors.white),
+                        ),
+                        onPressed: _sendEmail,
+                        child: const Icon(Icons.email),
+                      ),
+                      ElevatedButton(
+                        style: ButtonStyle(
+                          backgroundColor:
+                          MaterialStateProperty.all(Colors.brown),
+                          foregroundColor:
+                          MaterialStateProperty.all(Colors.white),
+                        ),
+                        onPressed: _filterSearch,
+                        child: const Icon(Icons.filter_alt),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 25.0),
+                  if (_isFiltered && !_reportGenerated)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16.0),
+                      child: Text(
+                        'Filtered for ${_dateFormatter.format(_startDate!).split(' ')[0]} to ${_dateFormatter.format(_endDate!).split(' ')[0]}',
+                        style: const TextStyle(
+                            color: Colors.brown, fontWeight: FontWeight.bold),
+                      ),
                     ),
-
-                    SizedBox(height: 16.0),
-                    Row
-                      (
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ElevatedButton(
-                          style: ButtonStyle(
-                            backgroundColor:
-                            MaterialStateProperty.resolveWith<Color?>(
-                                  (Set<MaterialState> states) {
-                                if (states.contains(MaterialState.pressed))
-                                  return Colors.green;
-                                return Colors.green;
-                              },
-                            ),
-                            foregroundColor:
-                            MaterialStateProperty.resolveWith<Color?>(
-                                  (Set<MaterialState> states) {
-                                if (states.contains(MaterialState.pressed))
-                                  return Colors.white;
-                                return Colors.white;
-                              },
-                            ),
-                          ),
-                          onPressed: _generateExcel,
-                          child: Icon(
-                            Icons.file_download,
-                          ),
-                        ),
-                        ElevatedButton(
-                          style: ButtonStyle(
-                            backgroundColor:
-                            MaterialStateProperty.resolveWith<Color?>(
-                                  (Set<MaterialState> states) {
-                                if (states.contains(MaterialState.pressed))
-                                  return Colors.red;
-                                return Colors.redAccent;
-                              },
-                            ),
-                            foregroundColor:
-                            MaterialStateProperty.resolveWith<Color?>(
-                                  (Set<MaterialState> states) {
-                                if (states.contains(MaterialState.pressed))
-                                  return Colors.white;
-                                return Colors.white;
-                              },
-                            ),
-                          ),
-                          onPressed: _sendEmail,
-                          child: Icon(
-                            Icons.email,
-                            color: Colors.white,
-                          ),
-                        ),
-                        ElevatedButton(
-                          style: ButtonStyle(
-                            backgroundColor:
-                            MaterialStateProperty.resolveWith<Color?>(
-                                  (Set<MaterialState> states) {
-                                if (states.contains(MaterialState.pressed))
-                                  return Colors.green;
-                                return Colors.brown;
-                              },
-                            ),
-                            foregroundColor:
-                            MaterialStateProperty.resolveWith<Color?>(
-                                  (Set<MaterialState> states) {
-                                if (states.contains(MaterialState.pressed))
-                                  return Colors.white;
-                                return Colors.white;
-                              },
-                            ),
-                          ),
-                          onPressed:
-                               _filterSearch,
-
-                          child: Icon(
-
-                                Icons.filter_alt
-
-                          ),
-                        ),
-                      ],
+                  if (_isFiltered && _reportGenerated)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16.0),
+                      child: Text(
+                        'Generated for ${_dateFormatter.format(_startDate!).split(' ')[0]} to ${_dateFormatter.format(_endDate!).split(' ')[0]}',
+                        style: const TextStyle(
+                            color: Colors.green, fontWeight: FontWeight.bold),
+                      ),
                     ),
-                    const SizedBox(height: 25.0),
-                    if (_isFiltered ==true && _reportGenerated==false)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16.0),
-                        child: Text(
-                          'Filtered for ${_dateFormatter.format(_startDate!).toString().split(' ')[0]} to ${_dateFormatter.format(_endDate!).toString().split(' ')[0]}',
-                          style: TextStyle(color: Colors.brown,fontWeight: FontWeight.bold),
+                  if (!_isFiltered && _reportGenerated)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16.0),
+                      child: const Text(
+                        'Generated for all recorded orders',
+                        style: TextStyle(
+                            color: Colors.green, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  if (_emailSent)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16.0),
+                      child: const Text(
+                        'Email sent Successfully',
+                        style: TextStyle(
+                            color: Colors.black, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  if (_filteredSearches.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16.0),
+                      child: Text(
+                        '${_filteredSearches.length} Orders',
+                        style: const TextStyle(
+                            color: Colors.deepPurple,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          // List of Orders
+          Expanded(
+            child: _isLoading && !_reportGenerated
+                ? const Center(child: CircularProgressIndicator())
+                : Padding(
+              padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+              child: ListView.builder(
+                itemCount: _filteredSearches.length,
+                itemBuilder: (context, index) {
+                  final order = _filteredSearches[index];
+                  return Card(
+                    color: Colors.white,
+                    margin: const EdgeInsets.symmetric(
+                        vertical: 8.0, horizontal: 16.0),
+                    elevation: 5,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(16.0),
+                      title: RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: '# ${index + 1}\n\n',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: Colors.black,
+                              ),
+                            ),
+                            TextSpan(
+                              text: '${order['customerName']}\n',
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                            TextSpan(
+                              text: '${order['date']}\n',
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w400),
+                            ),
+                            TextSpan(
+                              text: '${order['vehicleNumber']}\n',
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w900),
+                            ),
+                            TextSpan(
+                              text:
+                              '${order['materialType']} - T (${order['tonnage']}) - eT (${order['eTonnage']})',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    if (_isFiltered ==true && _reportGenerated==true)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16.0),
-                        child: Text(
-                          'Generated for ${_dateFormatter.format(_startDate!).toString().split(' ')[0]} to ${_dateFormatter.format(_endDate!).toString().split(' ')[0]}',
-                          style: TextStyle(color: Colors.green,fontWeight: FontWeight.bold),
-                        ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          if (order['paymentType'] == 'Credit')
+                            Image.asset(
+                              'asset/images/credit.png',
+                              width: 25,
+                              height: 25,
+                            ),
+                          if (order['paymentType'] != 'Credit')
+                            Image.asset(
+                              'asset/images/cash.png',
+                              width: 25,
+                              height: 25,
+                            ),
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/home',
+                                  arguments: order);
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (BuildContext context) {
+                                  return AlertDialog(
+                                    title: const Text('Delete Order'),
+                                    content: const Text(
+                                        'Are you sure you want to delete this order?'),
+                                    actions: <Widget>[
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.of(context).pop();
+                                          setState(() {
+                                            deleteOrder(index);
+                                          });
+                                        },
+                                        child: const Text('Delete'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.of(context).pop();
+                                        },
+                                        child: const Text('Cancel'),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                    if (_isFiltered ==false && _reportGenerated==true)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16.0),
-                        child: Text(
-                          'Generated for all recorded orders',
-                          style: TextStyle(color: Colors.green,fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    if (_emailSent)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16.0),
-                        child: Text(
-                          'Email sent Successfully',
-                          style: TextStyle(color: Colors.black,fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    if(_filteredSearches.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16.0),
-                        child: Text(
-                          '${_filteredSearches.length} Orders',
-                          style: TextStyle(color: Colors.deepPurple,fontWeight: FontWeight.bold,fontSize: 18),
-                        ),
-                      ),
-                  ],
-                ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -850,6 +1009,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       ),
       // drawer: const MyDrawer(),
     );
+
   }
 }
 

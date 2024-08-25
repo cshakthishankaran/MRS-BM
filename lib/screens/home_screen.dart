@@ -5,6 +5,7 @@ import 'package:company_studio/file_service.dart';
 import 'package:company_studio/screens/orders_and_new_order.dart';
   import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:searchfield/searchfield.dart';
   import 'package:uuid/uuid.dart';
   import 'package:path_provider/path_provider.dart';
   import 'dart:convert';
@@ -34,6 +35,7 @@ import 'package:intl/intl.dart';
     final TextEditingController _purchaseAmountController = TextEditingController();
     final TextEditingController _rentController = TextEditingController();
     final TextEditingController _descriptionController = TextEditingController();
+    final TextEditingController _paymentMethodController = TextEditingController();
     final FocusNode _tonnageFocusNode = FocusNode();
     final FocusNode _eTonnageFocusNode = FocusNode();
     late List<Map<String,dynamic>> _materials;
@@ -41,6 +43,9 @@ import 'package:intl/intl.dart';
     late bool _orderSubmitted ;
     late List<String> _vehicles =[];
     String? _selectedMaterial;
+    List<dynamic> _groupedOrders = [];
+    List<String>  _allCustomers = [];
+    List<String> _allLocations = [];
     Map<String, dynamic>? _order;
     String? _selectedVehicle;
     // final Map<String,List<String>> allFormHistoryItems ;
@@ -56,6 +61,8 @@ import 'package:intl/intl.dart';
           _order = arguments as Map<String, dynamic>;
           _getVehicleList();
           _getMaterialList();
+          _getCustomerList();
+          _getLocationList();
           editOrder(_order!);
 
 
@@ -66,11 +73,14 @@ import 'package:intl/intl.dart';
     void initState() {
       super.initState();
       fileService.backupFiles();
+      _groupedOrders = [];
       _dateController.text = _dateFormatter.format(DateTime.now()).toString().split(' ')[0];
       _materialsList = [];
       _orderSubmitted = false;
       _getVehicleList();
       _getMaterialList();
+      _getCustomerList();
+      _getLocationList();
 
       _tonnageFocusNode.addListener(() {
         if (!_tonnageFocusNode.hasFocus) {
@@ -114,6 +124,68 @@ import 'package:intl/intl.dart';
       _eTonnageFocusNode.dispose();
       super.dispose();
     }
+
+    void _getCustomerList() async{
+      final filePath = await _getFilePath('orders.json');
+      final file = File(filePath);
+
+      // Create the directory if it doesn't exist
+      if (!(await Directory(path.dirname(filePath)).exists())) {
+        await Directory(path.dirname(filePath)).create(recursive: true);
+      }
+
+      List<dynamic> orders = [];
+      Set <String> tempCustomers = {};
+
+      // Check if the file exists and read the contents
+      if (await file.exists()) {
+        final contents = await file.readAsString();
+        if (contents.isNotEmpty) {
+          orders = json.decode(contents);
+        }
+      }
+
+
+      for (var order in orders) {
+        tempCustomers.add(order['customerName']);
+      }
+
+      setState(() {
+        _allCustomers = tempCustomers.toList();
+      });
+    }
+
+    void _getLocationList() async {
+
+      final filePath = await _getFilePath('orders.json');
+      final file = File(filePath);
+
+      // Create the directory if it doesn't exist
+      if (!(await Directory(path.dirname(filePath)).exists())) {
+        await Directory(path.dirname(filePath)).create(recursive: true);
+      }
+
+      List<dynamic> orders = [];
+      Set <String> tempLocations = {};
+
+      // Check if the file exists and read the contents
+      if (await file.exists()) {
+        final contents = await file.readAsString();
+        if (contents.isNotEmpty) {
+          orders = json.decode(contents);
+        }
+      }
+
+
+      for (var order in orders) {
+        tempLocations.add(order['deliveryLocation']);
+      }
+
+      setState(() {
+        _allLocations = tempLocations.toList();
+      });
+    }
+
 
     void _getMaterialList() async {
 
@@ -167,6 +239,7 @@ import 'package:intl/intl.dart';
       _deliveryLocationController.text = order['deliveryLocation'];
       _tonnageController.text = order['tonnage'] ?? 0.000;
       _eTonnageController.text = order['eTonnage'] ?? 0.000;
+      _paymentMethodController.text = order.containsKey('paymentType') ? order['paymentType'] : 'Credit';
       _saleRateController.text = order['saleRate'];
       _purchaseRateController.text =order['purchaseRate'];
       _saleAmountController.text = order['saleAmount'];
@@ -236,7 +309,47 @@ import 'package:intl/intl.dart';
     //   print(fullPath);
     //   return fullPath;
     // }
+    Future<void> getCreditOrderByCustomerName( String customerName ) async {
+      if(customerName.trim()=='') {
+        setState(() {
+          _groupedOrders = [];
+          _saleRateController.text = '';
+        });
+      }else{
+        final filePath = await _getFilePath('orders.json');
+        final file = File(filePath);
 
+        // Create the directory if it doesn't exist
+        if (!(await Directory(path.dirname(filePath)).exists())) {
+          await Directory(path.dirname(filePath)).create(recursive: true);
+        }
+
+        List<dynamic> orders = [];
+        Set <dynamic> tempOrders = {};
+
+        // Check if the file exists and read the contents
+        if (await file.exists()) {
+          final contents = await file.readAsString();
+          if (contents.isNotEmpty) {
+            orders = json.decode(contents);
+          }
+        }
+
+
+        for (var order in orders) {
+          if(order['customerName'].contains(customerName)){
+            tempOrders.add(order);
+
+          }
+        }
+
+        setState(() {
+          _groupedOrders = tempOrders.toList();
+        });
+      }
+
+
+    }
     Future<void> _saveOrder(Map<String, dynamic> order) async {
       final filePath = await _getFilePath('orders.json');
       final file = File(filePath);
@@ -304,6 +417,7 @@ import 'package:intl/intl.dart';
           'purchaseRate': _purchaseRateController.text,
           'saleAmount': _saleAmountController.text,
           'purchaseAmount': _purchaseAmountController.text,
+          'paymentType' : _paymentMethodController.text,
           'rent': _rentController.text,
           'description' : _descriptionController.text
         };
@@ -404,9 +518,24 @@ import 'package:intl/intl.dart';
     void onMaterialSelection(String materialName){
 
       final material = _materials.where((material) => material['material'] == materialName).toList();
+      getCreditOrderByCustomerName(_customerNameController.text);
 
       setState(() {
         _purchaseRateController.text = material[0]['price'];
+        _groupedOrders.sort((a, b) {
+          DateTime dateA = _dateFormatter.parse(a['date']);
+          DateTime dateB = _dateFormatter.parse(b['date']);
+          return dateB.compareTo(dateA);
+        });
+        final lastOrder = _groupedOrders.where((order){
+          return (order['materialType']==materialName && order['customerName']==_customerNameController.text);
+        }).toList();
+
+        if(lastOrder.isNotEmpty){
+          _saleRateController.text  = lastOrder[0]['saleRate'];
+        }else{
+          _saleRateController.text  = '';
+        }
       });
 
     }
@@ -496,13 +625,93 @@ import 'package:intl/intl.dart';
                   ],
                 ),
                 const SizedBox(height: 10.0),
-                MyTextField(
+                SearchField(
+                  hint: "Customer Name",
                   controller: _customerNameController,
-                  hintText: 'Customer Name',
-                  obscureText: false,
                   textCapitalization: TextCapitalization.characters,
                   inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[A-Z ]'))],
+                  dynamicHeight: true,
+                  searchInputDecoration: InputDecoration(
+                      filled: true,
+                      fillColor:  Colors.white70,
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color : Theme.of(context).colorScheme.surface),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.black54),
+                      ),
+                      hintText: "Customer Name",
+                      hintStyle: TextStyle(
+                        color: Colors.black87,
+                      )
+                  ),
+                  suggestions: _allCustomers.map(SearchFieldListItem<String>.new)
+                      .toList(),
+                  suggestionState: Suggestion.expand,
+                    onSearchTextChanged: (query) {
+                          getCreditOrderByCustomerName(query);
+                          onMaterialSelection(_selectedMaterial!);
+                    }
                 ),
+                // MyTextField(
+                //   controller: _customerNameController,
+                //   hintText: 'Customer Name',
+                //   obscureText: false,
+                //   isSearchField: true,
+                //   // searchFieldSuggestions : (_allCustomers.map((e)=> SearchFieldListItem(e)).toList()),
+                //   searchFieldSuggestions: _allCustomers,
+
+                //   // onChanged: (value){
+                //   //   getCreditOrderByCustomerName(value!);
+                //   //   onMaterialSelection(_selectedMaterial!);
+                //   // },
+                //   textCapitalization: TextCapitalization.characters,
+                //   inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[A-Z ]'))],
+                // ),
+                // if(_allCustomers.length>0)
+                //   Stack(
+                //
+                //     children: [
+                //       Padding(
+                //         padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+                //         child: ListView.builder(
+                //           shrinkWrap: true, // Add this line
+                //           itemCount: _allCustomers.length,
+                //           itemBuilder: (context, index) {
+                //             final customer = _allCustomers[index];
+                //             return Card(
+                //               color: Colors.white,
+                //               margin: const EdgeInsets.symmetric(
+                //                 vertical: 5.0,
+                //                 horizontal: 10.0,
+                //               ),
+                //               elevation: 5,
+                //               child: ListTile(
+                //                 contentPadding: const EdgeInsets.all(10.0),
+                //                 title: RichText(
+                //                   text: TextSpan(
+                //                     children: [
+                //                       TextSpan(
+                //                         text: '${customer}\n\n',
+                //                         style: const TextStyle(
+                //                           fontWeight: FontWeight.bold,
+                //                           fontSize: 12,
+                //                           color: Colors.black,
+                //                         ),
+                //                       ),
+                //
+                //                     ],
+                //                   ),
+                //                 ),
+                //               ),
+                //             );
+                //           },
+                //         ),
+                //       ),
+                //     ],
+                //   )0,
+
+
                 const SizedBox(height: 10.0),
                 Row(
                   children: [
@@ -544,6 +753,8 @@ import 'package:intl/intl.dart';
                   controller: _deliveryLocationController,
                   hintText: 'Delivery Location',
                   obscureText: false,
+                  isSearchField : true,
+                  // searchFieldSuggestions:_allLocations,
                   textCapitalization: TextCapitalization.characters,
                   inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[A-Z0-9 ]'))],
                 ),
@@ -629,7 +840,6 @@ import 'package:intl/intl.dart';
 
                   ],
                 ),
-                const SizedBox(height: 10,),
 
                 const SizedBox(height: 10,),
                 Row(
@@ -666,6 +876,55 @@ import 'package:intl/intl.dart';
 
 
 
+
+                  ],
+                ),
+                const SizedBox(height: 10,),
+                Row(
+                  children: [
+
+                    Expanded(
+                      child: ListTile(
+                        title: const Text('Credit'),
+                        leading: Radio<String>(
+                          value: 'Credit',
+                          groupValue: _paymentMethodController.text,
+                          activeColor: Colors.yellow,
+                          onChanged: (String? value) {
+                            setState(() {
+                              _paymentMethodController.text = value!;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+
+                    // Image.asset(
+                    //   'asset/images/credit.png',
+                    //   width: 50,
+                    //   height: 50,
+                    // ),
+                    const SizedBox(width:10.0),// Add space between the fields
+                      Expanded(
+                      child: ListTile(
+                        title: const Text('Cash'),
+                        leading: Radio<String>(
+                          value: 'Cash',
+                          groupValue: _paymentMethodController.text,
+                          activeColor: Colors.yellow,
+                          onChanged: (String? value) {
+                            setState(() {
+                              _paymentMethodController.text = value!;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                    // Image.asset(
+                    //   'asset/images/cash.png',
+                    //   width: 35,
+                    //   height: 20,
+                    // ),
 
                   ],
                 ),

@@ -36,7 +36,7 @@ Future<void> checkAndRestore(FileService fileService) async {
   // Compare stored app version with the current app version
   final prefs = await SharedPreferences.getInstance();
   final lastVersion = prefs.getString('app_version');
-  final currentVersion = '1.0.3'; // Replace with your app's current version
+  final currentVersion = '1.1.0'; // Replace with your app's current version
 
   if (lastVersion != currentVersion) {
     // This is an update; restore the file

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:searchfield/searchfield.dart';
 
 class MyTextField extends StatelessWidget {
   final TextEditingController controller;
@@ -10,12 +11,16 @@ class MyTextField extends StatelessWidget {
   final TextInputType keyboardType;
   final GestureTapCallback? onTap;
   final bool isDropdown;
+  final bool isSearchField;
   final List<String>? dropdownItems;
   final String? selectedItem;
   final ValueChanged<String?>? onChanged;
+  // final List<SearchFieldListItem<String>>? Function(String)? onSearchTextChange;
   final Widget? suffixIcon;
   final FocusNode? focusNode;
   final bool readOnly;
+  // Function(dynamic query) onSearchTextChange;
+  // final List<String> searchFieldSuggestions;
 
   const MyTextField({
     Key? key,
@@ -33,8 +38,11 @@ class MyTextField extends StatelessWidget {
     this.suffixIcon,
     this.focusNode,
     this.readOnly = false,
+    this.isSearchField = false,
+    // this.searchFieldSuggestions =  const [],
 
   }) : super(key: key);
+
 
 
 
@@ -66,7 +74,7 @@ class MyTextField extends StatelessWidget {
       value: selectedItem,
       onChanged: onChanged,
     )
-        : TextField(
+        :  TextField(
       controller: controller,
       focusNode : focusNode,
       textAlignVertical: TextAlignVertical.top,

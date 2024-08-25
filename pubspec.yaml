@@ -41,6 +41,8 @@ dependencies:
   flutter_launcher_icons: ^0.11.0
   flutter_downloader: ^1.8.4
   excel: ^2.0.8
+  http : ^1.2.2
+  file_picker : ^8.1.2
   flutter_email_sender: ^5.0.3
   mailer: ^6.1.2
   open_file: ^3.2.1
@@ -49,6 +51,7 @@ dependencies:
   googleapis: ^13.2.0
   googleapis_auth: ^1.6.0
   permission_handler: ^10.2.0
+  searchfield: ^1.0.9
 #  input_history_text_field: ^0.3.0
 
 
@@ -83,6 +86,8 @@ flutter:
     - asset/images/mrs_logo-3.png
     - asset/images/mrs_logo-3-nb.png
     - asset/images/app-logo-white.png
+    - asset/images/cash.png
+    - asset/images/credit.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
