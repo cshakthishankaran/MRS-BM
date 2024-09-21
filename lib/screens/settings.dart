@@ -9,6 +9,19 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+
+
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _loadOrders();
+  //   _getMaterialList();
+  //   _getCustomerList();
+  //   requestManageExternalStoragePermission();
+  // }
+
+
   @override
   Widget build(BuildContext context) {
     return const Placeholder();

@@ -9,6 +9,8 @@ import "package:company_studio/screens/vehicles.dart";
 import "package:flutter/material.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
+import "../screens/backup_restore.dart";
+
 
 class MyDrawer extends StatelessWidget {
   const MyDrawer({super.key});
@@ -75,7 +77,10 @@ class MyDrawer extends StatelessWidget {
           //   Navigator.push(context,MaterialPageRoute(builder: (context) => const SettingsPage(),));
           // }
           // ),
-
+          MyDrawerTile(text: "BackUp & Restore", icon: Icons.save, onTap: (){
+            Navigator.pop(context);
+            Navigator.push(context , MaterialPageRoute(builder: (context) =>  BackupRestoreScreen(),));
+          } ),
           const Spacer(),
           MyDrawerTile(text: "Log Out", icon: Icons.logout, onTap: (){
             setLogOut();

@@ -36,11 +36,12 @@ Future<void> checkAndRestore(FileService fileService) async {
   // Compare stored app version with the current app version
   final prefs = await SharedPreferences.getInstance();
   final lastVersion = prefs.getString('app_version');
-  final currentVersion = '1.1.0'; // Replace with your app's current version
-
+  final currentVersion = '2.0.1'; // Replace with your app's current version
+  // final releaseData = "";
   if (lastVersion != currentVersion) {
     // This is an update; restore the file
     await fileService.restoreOrdersFile();
+    prefs.setString('app_version', currentVersion);
     prefs.setString('app_version', currentVersion);
   }
 }
@@ -50,7 +51,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'MRS-BM',
       theme: Provider.of<ThemeProvider>(context).themeData,
       // home: const LoginOrRegister(),
       debugShowCheckedModeBanner: false,

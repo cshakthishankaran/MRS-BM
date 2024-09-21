@@ -147,7 +147,10 @@ import 'package:searchfield/searchfield.dart';
 
 
       for (var order in orders) {
-        tempCustomers.add(order['customerName']);
+        if(order['customerName'].toString().trim()!=""){
+          tempCustomers.add(order['customerName']);
+        }
+
       }
 
       setState(() {
@@ -178,7 +181,10 @@ import 'package:searchfield/searchfield.dart';
 
 
       for (var order in orders) {
-        tempLocations.add(order['deliveryLocation']);
+        if (order['deliveryLocation'].toString().trim()!=""){
+          tempLocations.add(order['deliveryLocation']);
+        }
+
       }
 
       setState(() {
@@ -309,7 +315,7 @@ import 'package:searchfield/searchfield.dart';
     //   print(fullPath);
     //   return fullPath;
     // }
-    Future<void> getCreditOrderByCustomerName( String customerName ) async {
+    Future<bool> getCreditOrderByCustomerName( String customerName ) async {
       if(customerName.trim()=='') {
         setState(() {
           _groupedOrders = [];
@@ -348,6 +354,7 @@ import 'package:searchfield/searchfield.dart';
         });
       }
 
+      return true;
 
     }
     Future<void> _saveOrder(Map<String, dynamic> order) async {
@@ -515,10 +522,10 @@ import 'package:searchfield/searchfield.dart';
       });
     }
 
-    void onMaterialSelection(String materialName){
+    Future<void> onMaterialSelection(String materialName) async {
 
       final material = _materials.where((material) => material['material'] == materialName).toList();
-      getCreditOrderByCustomerName(_customerNameController.text);
+       bool isGrouped  = await getCreditOrderByCustomerName(_customerNameController.text);
 
       setState(() {
         _purchaseRateController.text = material[0]['price'];
@@ -648,10 +655,9 @@ import 'package:searchfield/searchfield.dart';
                   suggestions: _allCustomers.map(SearchFieldListItem<String>.new)
                       .toList(),
                   suggestionState: Suggestion.expand,
-                    onSearchTextChanged: (query) {
-                          getCreditOrderByCustomerName(query);
-                          onMaterialSelection(_selectedMaterial!);
-                    }
+                    // onSearchTextChanged: (query) {
+                    //       return null;
+                    // }
                 ),
                 // MyTextField(
                 //   controller: _customerNameController,
@@ -713,7 +719,7 @@ import 'package:searchfield/searchfield.dart';
 
 
                 const SizedBox(height: 10.0),
-                Row(
+                  Row(
                   children: [
                     Expanded(child: MyTextField(
                       controller: TextEditingController(), // Dummy controller
@@ -749,14 +755,41 @@ import 'package:searchfield/searchfield.dart';
                 ),
 
                 const SizedBox(height: 10.0),
-                MyTextField(
+                // MyTextField(
+                //   controller: _deliveryLocationController,
+                //   hintText: 'Delivery Location',
+                //   obscureText: false,
+                //   isSearchField : true,
+                //   // searchFieldSuggestions:_allLocations,
+                //   textCapitalization: TextCapitalization.characters,
+                //   inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[A-Z0-9 ]'))],
+                // ),
+                SearchField(
+                  hint: "Delivery Location",
                   controller: _deliveryLocationController,
-                  hintText: 'Delivery Location',
-                  obscureText: false,
-                  isSearchField : true,
-                  // searchFieldSuggestions:_allLocations,
                   textCapitalization: TextCapitalization.characters,
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[A-Z0-9 ]'))],
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[A-Z ]'))],
+                  dynamicHeight: true,
+                  searchInputDecoration: InputDecoration(
+                      filled: true,
+                      fillColor:  Colors.white70,
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color : Theme.of(context).colorScheme.surface),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.black54),
+                      ),
+                      hintText: "Delivery Location",
+                      hintStyle: TextStyle(
+                        color: Colors.black87,
+                      )
+                  ),
+                  suggestions: _allLocations.map(SearchFieldListItem<String>.new)
+                      .toList(),
+                  suggestionState: Suggestion.expand,
+                  // onSearchTextChanged: (query) {
+                  //       return null;
+                  // }
                 ),
                 const SizedBox(height: 10.0),
                 Row(
@@ -950,7 +983,7 @@ import 'package:searchfield/searchfield.dart';
             ),
           ),
         ),
-        // drawer: MyDrawer(),
+        drawer: MyDrawer(),
       );
     }
 

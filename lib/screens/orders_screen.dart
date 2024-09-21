@@ -1,11 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:company_studio/components/my_textfield.dart';
 import 'package:excel/excel.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:googleapis/drive/v3.dart' as drive;
-import 'package:googleapis_auth/googleapis_auth.dart' as auth;
-import 'package:company_studio/components/my_drawer.dart';
 import 'package:open_file/open_file.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
@@ -31,9 +30,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
   bool _reportGenerated = false;
   bool _emailSent = false;
   bool _isLoading = false;
+  List<String>  _allCustomers = [];
   List<dynamic> _filteredSearches = [];
   String _filePath = "";
   late List<Map<String,dynamic>> _materials ;
+  TextEditingController _outstandingBalanceController = TextEditingController();
+  TextEditingController _lastPaymentController = TextEditingController();
+  String? _customerName;
+  bool _hasCustomerFiltration = false;
   late List<String>  _materialsList ;
 
 
@@ -42,6 +46,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     super.initState();
     _loadOrders();
     _getMaterialList();
+    _getCustomerList();
     requestManageExternalStoragePermission();
   }
 
@@ -148,7 +153,73 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return groupedOrders;
   }
 
-  Future<String> _generateExcel() async {
+  void showPaymentDialogBox(){
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Enter Payment Details'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height:16,),
+              MyTextField(
+                controller: _outstandingBalanceController,
+                keyboardType: TextInputType.number,
+                hintText: "Outstanding Balance",
+                obscureText: false,
+              ),
+              const SizedBox(height:16,),
+              MyTextField(
+                controller: _lastPaymentController,
+                keyboardType: TextInputType.number,
+                hintText: "Last Payment",
+                obscureText: false,
+              ),
+              const SizedBox(height:16,),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _isLoading=false;
+                });
+                Navigator.of(context).pop(); // Close dialog
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _generateExcelForCustomer();
+                });
+
+
+                Navigator.of(context).pop(); // Close dialog
+              },
+              child: Text('Submit'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<String> _generateExcelForCustomer() async{
+    setState(() {
+      _isLoading = true;
+      _emailSent = false;
+    });
+
+    ();
+
+
+
+    return "";
+  }
+
+  Future<String> _generateAllExcel() async {
     setState(() {
       _isLoading = true;
       _emailSent = false;
@@ -216,6 +287,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
       'Payment Type',
     ];
 
+    List<String> customerSalesHeaders = [
+      'S.No',
+      'Date',
+      'Vehicle Number',
+      // 'Customer Name',
+      'Material Type',
+      'Delivery Location',
+      'Tonnage',
+      'Sales Rate',
+      'Rent',
+      'Sales Amount',
+      // 'Payment Type',
+    ];
+
     List<String> cashSalesHeaders = [
       'S.No',
       'Date',
@@ -227,7 +312,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       'Sales Rate',
       'Rent',
       'Sales Amount',
-      'Payment Type',
+      // 'Payment Type',
     ];
 
     List<String> purchaseHeaders = [
@@ -339,7 +424,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           int.parse(order['saleRate']),
           int.parse(order['rent']),
           int.parse(order['saleAmount']),
-          order['paymentType']
+          // order['paymentType']
 
         ]);
       }
@@ -356,7 +441,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           int.parse(order['saleRate']),
           int.parse(order['rent']),
           int.parse(order['saleAmount']),
-          order['paymentType']
+          // order['paymentType']
 
         ]);
       }
@@ -398,32 +483,60 @@ class _OrdersScreenState extends State<OrdersScreen> {
     for (var customer in groupedOrders.keys ){
       var customerSheet = excel[customer];
 
-      for (int i = 0; i < creditSalesHeaders.length; i++) {
-        var cell = customerSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
-        cell.value = creditSalesHeaders[i];
-        cell.cellStyle = cellStyle;
+      var cell = customerSheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0));
+      cell.value = "Customer Name";
+      cell.cellStyle = cellStyle;
+
+      cell = customerSheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0));
+      cell.value = customer;
+      cell.cellStyle = cellStyle;
+
+      for (int i =0; i < customerSalesHeaders.length; i++) {
+
+          var cell = customerSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 2));
+          cell.value = customerSalesHeaders[i];
+          cell.cellStyle = cellStyle;
+
+
       }
+
       var rowIndex = 0;
       for (var order in groupedOrders[customer]!){
         rowIndex+=1 ;
+        customerSheet.cell(CellIndex.indexByColumnRow(columnIndex:1,rowIndex:customerSheet.rows.length -1));
         customerSheet.appendRow([
           rowIndex,
           order['date'],
           order['vehicleNumber'],
-          order['customerName'],
+          // order['customerName'],
           order['materialType'],
           order['deliveryLocation'],
           double.parse(order['eTonnage']),
           int.parse(order['saleRate']),
           int.parse(order['rent']),
           int.parse(order['saleAmount']),
-          order['paymentType']
+          // order['paymentType']
 
         ]);
       }
+      var totalNameCell = customerSheet.cell(CellIndex.indexByColumnRow(columnIndex: customerSalesHeaders.length-3, rowIndex: customerSheet.rows.length+1));
+      totalNameCell.value = "Total" ;
+      totalNameCell.cellStyle = cellStyle;
 
-      for (int i = 0; i < creditSalesHeaders.length; i++) {
-        int maxLength = creditSalesHeaders[i].length;
+      int totalAmount = 0;
+
+      for (var order in groupedOrders[customer]!){
+        int saleAmount = int.parse(order['saleAmount']);
+        totalAmount += saleAmount;
+      }
+
+      var totalValueCell = customerSheet.cell(CellIndex.indexByColumnRow(columnIndex: customerSalesHeaders.length-2, rowIndex: customerSheet.rows.length-1));
+      totalValueCell.value = totalAmount;
+      // totalValueCell.cellStyle = cellStyle;
+
+
+      for (int i = 0; i < customerSalesHeaders.length; i++) {
+        int maxLength = customerSalesHeaders[i].length;
         for (var row in customerSheet.rows) {
           String cellValue = row[i]?.value?.toString() ?? '';
           if (cellValue.length > maxLength) {
@@ -493,6 +606,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       purchaseSheet.setColWidth(i, maxLength.toDouble() + 5.0); // Adjust column width
     }
 
+    excel.unLink("Sheet1");
     // Get the path to the internal storage 'Download' directory
     Directory? directory = Directory('/storage/emulated/0/Download');
     String filename = (_startDate == null || _endDate == null)
@@ -509,7 +623,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final result = await OpenFile.open(filePath);
 
     // Check result
-    if (result.type != ResultType.done) {
+    if (result.type != FilePickerStatus.done) {
       print('Failed to open file: ${result.message}');
     }
 
@@ -587,7 +701,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     });
 
     // Generate the Excel file and get the file path
-    String filePath = await _generateExcel();
+    String filePath = await _generateAllExcel();
 
     // Get username from SharedPreferences
     String userName = prefs.getString('username') ?? '';
@@ -645,6 +759,38 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
+  void _getCustomerList() async{
+    final filePath = await _getFilePath('orders.json');
+    final file = File(filePath);
+
+    // Create the directory if it doesn't exist
+    if (!(await Directory(path.dirname(filePath)).exists())) {
+      await Directory(path.dirname(filePath)).create(recursive: true);
+    }
+
+    List<dynamic> orders = [];
+    Set <String> tempCustomers = {};
+
+    // Check if the file exists and read the contents
+    if (await file.exists()) {
+      final contents = await file.readAsString();
+      if (contents.isNotEmpty) {
+        orders = json.decode(contents);
+      }
+    }
+
+
+    for (var order in orders) {
+      if(order['customerName'].toString().trim()!=""){
+        tempCustomers.add(order['customerName']);
+      }
+
+    }
+
+    setState(() {
+      _allCustomers = tempCustomers.toList();
+    });
+  }
 
 
 
@@ -656,6 +802,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     });
     _loadOrders();
   }
+
 
   Future<void> _filterSearch() async {
     setState(() {
@@ -724,6 +871,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
 
 
+   Future<void> clearCustomerFilter() async{
+      setState(() {
+        _customerName =null;
+        _hasCustomerFiltration = false;
+      });
+    }
 
 
   @override
@@ -796,9 +949,56 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ],
                   ),
                   const SizedBox(height: 16.0),
+                  Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Row(
+                      children: [
+                        Expanded(  // Changed to Expanded to ensure proper space allocation in the Row
+                          flex: 9,
+                          child:
+                          MyTextField(
+                            controller: TextEditingController(), // Dummy controller
+                            hintText: 'Filter by Customer',
+                            obscureText: false,
+                            isDropdown: true,
+                            dropdownItems: _allCustomers,
+                            selectedItem: _customerName,
+                            onChanged: (newValue) {
+                              setState(() {
+                                _hasCustomerFiltration = true;
+                                _customerName = newValue;
+                              });
+                            },
+                          ),
+                        ),
+                        if (_hasCustomerFiltration)
+                          IconButton(
+                            onPressed: () {
+                              setState(() {
+                                clearCustomerFilter();
+                              });
+
+                            },
+                            icon: Icon(Icons.clear),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16,),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
+                      ElevatedButton(
+                        style: ButtonStyle(
+                          backgroundColor:
+                          MaterialStateProperty.all(Colors.blue),
+                          foregroundColor:
+                          MaterialStateProperty.all(Colors.white),
+                        ),
+                        onPressed: showPaymentDialogBox,
+                        child: const Icon(Icons.share),
+                      ),
                       ElevatedButton(
                         style: ButtonStyle(
                           backgroundColor:
@@ -806,7 +1006,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           foregroundColor:
                           MaterialStateProperty.all(Colors.white),
                         ),
-                        onPressed: _generateExcel,
+                        onPressed: _generateAllExcel,
                         child: const Icon(Icons.file_download),
                       ),
                       ElevatedButton(

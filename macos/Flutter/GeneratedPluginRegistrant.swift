@@ -5,7 +5,7 @@
 import FlutterMacOS
 import Foundation
 
-import open_file
+import open_file_mac
 import path_provider_foundation
 import shared_preferences_foundation
 
