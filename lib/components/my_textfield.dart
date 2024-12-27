@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:searchfield/searchfield.dart';
 
 class MyTextField extends StatelessWidget {
   final TextEditingController controller;

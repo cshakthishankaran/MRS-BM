@@ -1,10 +1,8 @@
 import "package:company_studio/components/my_drawer_tile.dart";
-import "package:company_studio/screens/expenses_and_new_expense.dart";
-import "package:company_studio/screens/home_screen.dart";
+import "package:company_studio/screens/customers_and_balance.dart";
 import "package:company_studio/screens/login_screen.dart";
 import "package:company_studio/screens/materials.dart";
 import "package:company_studio/screens/orders_and_new_order.dart";
-import "package:company_studio/screens/orders_screen.dart";
 import "package:company_studio/screens/vehicles.dart";
 import "package:flutter/material.dart";
 import "package:shared_preferences/shared_preferences.dart";
@@ -67,6 +65,10 @@ class MyDrawer extends StatelessWidget {
             Navigator.pop(context);
             Navigator.push(context , MaterialPageRoute(builder: (context) => const VehicleScreen(),));
             } ),
+          MyDrawerTile(text: "Customers", icon: Icons.person, onTap: (){
+            Navigator.pop(context);
+            Navigator.push(context , MaterialPageRoute(builder: (context) => const CustomersAndBalanceScreen(),));
+          } ),
           MyDrawerTile(text: "Materials", icon: Icons.construction, onTap: (){
             Navigator.pop(context);
             Navigator.push(context , MaterialPageRoute(builder: (context) => const MaterialsScreen(),));

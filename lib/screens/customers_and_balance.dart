@@ -1,15 +1,17 @@
 import 'package:company_studio/components/my_drawer.dart';
-import 'package:company_studio/screens/expeneses_screen.dart';
-import 'package:company_studio/screens/home_screen.dart';
+import 'package:company_studio/screens/customers_balance.dart';
+import 'package:company_studio/screens/customers_screen.dart';
 import 'package:flutter/material.dart';
 
+class CustomersAndBalanceScreen extends StatefulWidget {
+  const CustomersAndBalanceScreen({super.key});
 
-class ExpensesAndNewExpenseScreen extends StatefulWidget {
   @override
-  _ExpensesAndNewExpenseScreenState createState() => _ExpensesAndNewExpenseScreenState();
+  State<CustomersAndBalanceScreen> createState() => _CustomersAndBalanceScreenState();
 }
 
-class _ExpensesAndNewExpenseScreenState extends State<ExpensesAndNewExpenseScreen> with SingleTickerProviderStateMixin {
+class _CustomersAndBalanceScreenState extends State<CustomersAndBalanceScreen> with SingleTickerProviderStateMixin {
+
   late TabController _tabController;
 
   @override
@@ -28,20 +30,20 @@ class _ExpensesAndNewExpenseScreenState extends State<ExpensesAndNewExpenseScree
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Expenses Panel'),
+        title: Text('Manage Customers'),
         bottom: TabBar(
           controller: _tabController,
           tabs: [
-            Tab(text: 'New Expense'),
-            Tab(text: 'Expenses'),
+            Tab(text: 'Customers'),
+            Tab(text: 'Balance'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          HomeScreen(), // First page content
-          ExpensesScreen(), // Second page content
+          CustomersScreen(), // First page content
+          CustomersBalanceScreen(), // Second page content
         ],
       ),
       drawer: MyDrawer(),

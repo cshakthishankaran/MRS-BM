@@ -1,11 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class DecimalTextInputFormatter extends TextInputFormatter {
   final int decimalRange;
 
   DecimalTextInputFormatter({this.decimalRange = 3})
-      : assert(decimalRange != null && decimalRange > 0);
+      : assert(decimalRange > 0);
 
   @override
   TextEditingValue formatEditUpdate(

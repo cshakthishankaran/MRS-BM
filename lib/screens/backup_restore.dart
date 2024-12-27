@@ -1,7 +1,6 @@
 import "dart:io";
 
 import "package:archive/archive.dart";
-import "package:company_studio/components/my_button.dart";
 import "package:company_studio/components/my_drawer.dart";
 import "package:file_picker/file_picker.dart";
 import "package:flutter/material.dart";
@@ -69,7 +68,8 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen>  {
     List<String> filesToBackup = [
       'orders.json',
       'materials.json',
-      'vehicles.json'
+      'vehicles.json',
+      'customers.json'
       // Add more file paths as needed
     ];
 

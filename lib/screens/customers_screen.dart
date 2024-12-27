@@ -1,36 +1,50 @@
-import "dart:convert";
-import "dart:io";
-import "package:company_studio/components/my_button.dart";
-import "package:company_studio/components/my_drawer.dart";
-import "package:company_studio/components/my_textfield.dart";
-import "package:flutter/material.dart";
-import "package:flutter/services.dart";
-import "package:path_provider/path_provider.dart";
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:company_studio/components/my_button.dart';
+import 'package:company_studio/components/my_drawer.dart';
+import 'package:company_studio/components/my_textfield.dart';
+import 'package:company_studio/screens/customers_and_balance.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:uuid/uuid.dart';
 
+class Transaction {
+  final String id;
+  final String type; // 'borrowed' or 'paid'
+  final int amount;
+  final String date;
 
-
-class VehicleScreen extends StatefulWidget {
-  const VehicleScreen({super.key});
-
-  @override
-  State<VehicleScreen> createState() => _VehicleScreenState();
+  Transaction({required this.id, required this.type, required this.amount, required this.date});
 }
 
-class _VehicleScreenState extends State<VehicleScreen> {
+class CustomersScreen extends StatefulWidget {
+  const CustomersScreen({super.key});
+
+  @override
+  State<CustomersScreen> createState() => _CustomersScreenState();
+}
+
+class _CustomersScreenState extends State<CustomersScreen> {
+
+  final TextEditingController _customerNameController = TextEditingController();
+  final TextEditingController _newBalanceController = TextEditingController();
+  late List<String> _customers =[];
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _vehicleNumberController = TextEditingController();
-  late List<String> _vehicles =[];
   bool _editMode = false;
   bool _isButtonDisabled = false;
   bool _isLoading = false;
+
 
   @override
   void initState() {
     super.initState();
 
-    _getVehicleList();
-    _vehicleNumberController.addListener(_checkInput);
+    _getCustomerList();
+    _customerNameController.addListener(_checkInput);
   }
 
   Future<String> _getFilePath(filename) async {
@@ -42,34 +56,34 @@ class _VehicleScreenState extends State<VehicleScreen> {
     return fullPath;
   }
 
-  void _getVehicleList() async {
+  void _getCustomerList() async {
     setState(() {
       _isLoading = true; // Show the loader
     });
-    final filePath = await _getFilePath('vehicles.json');
-    final file = File(filePath);
+    final filePath = await _getFilePath('customers.json');
+    File file = File(filePath);
 
     // Create the directory if it doesn't exist
-    if (!(await Directory(path.dirname(filePath)).exists())) {
+    if ((await Directory(path.dirname(filePath)).exists())) {
       await Directory(path.dirname(filePath)).create(recursive: true);
     }
-    
+
     await Future.delayed(const Duration(seconds: 1));
-    List<String> vehicles = [];
+    List<String> customers = [];
 
     // Check if the file exists and read the contents
     if (await file.exists()) {
       final contents = await file.readAsString();
       if (contents.isNotEmpty) {
         // Cast the dynamic list to a List<String>
-        vehicles = List<String>.from(json.decode(contents));
+        customers = List<String>.from(json.decode(contents));
         setState(() {
-          _vehicles = vehicles;
+          _customers = customers;
         });
 
       }
     }
-    print('VehicleScreen --> ${_vehicles}');
+    print('CustomerScreen --> ${_customers}');
     setState(() {
       _isLoading = false; // Hide the loader
     });
@@ -77,19 +91,19 @@ class _VehicleScreenState extends State<VehicleScreen> {
 
   void _checkInput() {
     setState(() {
-      _isButtonDisabled = _vehicleNumberController.text.isEmpty;
+      _isButtonDisabled = _customerNameController.text.isEmpty;
     });
   }
 
   @override
   void dispose() {
     // Dispose of the controller when done
-    _vehicleNumberController.dispose();
+    _customerNameController.dispose();
     super.dispose();
   }
 
-  Future<void> _saveVehicle(String vehicle) async {
-    final filePath = await _getFilePath('vehicles.json');
+  Future<void> _saveCustomer(customer) async {
+    final filePath = await _getFilePath('customers.json');
     final file = File(filePath);
 
     // Create the directory if it doesn't exist
@@ -97,14 +111,14 @@ class _VehicleScreenState extends State<VehicleScreen> {
       await Directory(path.dirname(filePath)).create(recursive: true);
     }
 
-    List<String> vehicles = [];
+    List<String> customers = [];
 
     // Check if the file exists and read the contents
     if (await file.exists()) {
       final contents = await file.readAsString();
       if (contents.isNotEmpty) {
         setState(() {
-          vehicles = List<String>.from(json.decode(contents));
+          customers = List<String>.from(json.decode(contents));
         });
 
       }
@@ -113,34 +127,74 @@ class _VehicleScreenState extends State<VehicleScreen> {
     // Check for duplicates before adding the new vehicle
 
 
-      final existingVehicleIndex = vehicles.indexWhere((o) => o== vehicle);
-      if (existingVehicleIndex !=   -1) {
-        // Replace the existing order
-        vehicles[existingVehicleIndex] = vehicle;
-      }else{
-        vehicles.add(vehicle);
-      }
-      _editMode != _editMode;
-      await file.writeAsString(json.encode(vehicles)).then((value)=> _vehicles = vehicles);
+    final existingCustomerIndex = customers.indexWhere((o) => o== customer);
+    if (existingCustomerIndex !=   -1) {
+      // Replace the existing order
+      customers[existingCustomerIndex] = customer;
+    }else{
+      customers.add(customer);
+    }
+    _editMode != _editMode;
+    await file.writeAsString(json.encode(customers)).then((value)=> _customers = customers);
 
   }
 
 
-  void _submitForm() {
+  Future<void> _submitForm() async {
+
+    // String? description = await getDescription(context);
+
+    // if (description != null && description.isNotEmpty) {
+    //   // Proceed to add the order with the description
+    //   _descriptionController.text= description;
+    //   // Add your logic here to save or process the order
+    // } else {
+    //   _descriptionController.text= 'No description provided';
+    // }
     if (_formKey.currentState?.validate() ?? false) {
-      if(!_vehicleNumberController.text.isEmpty){
-        _saveVehicle(_vehicleNumberController.text).then((_) {
-          Navigator.pushNamed(context, '/vehicle');
-        });
-      }
+      var now = DateTime.now();
+      final uuid = Uuid();
+      final transaction = Transaction(id: uuid.v4(), type: "Credit", amount: int.parse(_newBalanceController.text), date: DateFormat('yyyy-MM-dd – kk:mm').format(now));
+      final customer = {
+        'id': uuid.v4(),
+        'created_date':  DateFormat('yyyy-MM-dd – kk:mm').format(now),
+        'customerName': _customerNameController.text.toUpperCase(),
+        'newBalance': _newBalanceController.text,
+        'transactions' : [
+          transaction
+        ]
+
+      };
+
+      await _saveCustomer(customer);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Order Recorded Successfully'),
+          duration: const Duration(seconds: 1), // Automatically dismiss after 0.5 seconds
+        ),
+      );
+
+
+      await _clearForm();
+      Navigator.pop(context);
+      Navigator.push(context , MaterialPageRoute(builder: (context) =>  CustomersAndBalanceScreen(),));
+
 
     }
-
   }
-  void _editVehicle(String vehicle) {
+
+  Future<void> _clearForm() async {
+    setState(() {
+      _customerNameController.clear();
+      _newBalanceController.clear();
+    });
+  }
+
+  void _editCustomer(String vehicle) {
     print(vehicle);
     _editMode = true;
-    _vehicleNumberController.text = vehicle;
+    _customerNameController.text = vehicle;
 
 
   }
@@ -160,8 +214,8 @@ class _VehicleScreenState extends State<VehicleScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
                 setState(() {
-                  _vehicles.removeAt(index);
-                  file.writeAsString(json.encode(_vehicles));
+                  _customers.removeAt(index);
+                  file.writeAsString(json.encode(_customers));
                 });
               },
               child: const Text('Delete'),
@@ -178,21 +232,11 @@ class _VehicleScreenState extends State<VehicleScreen> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text(
-          'Add Vehicle',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        backgroundColor: Colors.white,
-      ),
-      body: Padding(
+      body:
+      Padding(
         padding: const EdgeInsets.all(20.0),
         child: Form(
           key: _formKey,
@@ -202,26 +246,36 @@ class _VehicleScreenState extends State<VehicleScreen> {
                 children: [
                   const SizedBox(height: 10.0),
                   MyTextField(
-                    controller: _vehicleNumberController,
-                    hintText: 'Vehicle Number',
+                    controller: _customerNameController,
+                    hintText: 'Customer Name',
                     obscureText: false,
                     textCapitalization: TextCapitalization.characters,
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp('[A-Z0-9]'))
+                      FilteringTextInputFormatter.allow(RegExp('[A-Z]'))
                     ],
+                  ),
+                  const SizedBox(height: 10.0),
+                  MyTextField(
+                    controller: _newBalanceController,
+                    hintText: 'New Balance',
+                    obscureText: false,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp('[0-9.]')),
+                    ],
+                    keyboardType: TextInputType.numberWithOptions(decimal: false),
                   ),
                   const SizedBox(height: 10.0),
                   _isLoading
                       ? Center(child: CircularProgressIndicator())
-                    :MyButton(
+                      :MyButton(
                     onTap: _submitForm,
                     isEnabled: _isButtonDisabled == true ? _isButtonDisabled : false,
-                    text: _editMode ==false ? "Add Vehicle" : "Save Vehicle",
+                    text: _editMode ==false ? "Add Customer" : "Edit Customer",
                     padding: const EdgeInsets.all(10),
                   ),
                   const SizedBox(height: 20.0),
                   const Text(
-                    'Saved Vehicles:',
+                    'Customer List:',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10.0),
@@ -229,9 +283,9 @@ class _VehicleScreenState extends State<VehicleScreen> {
                     height: MediaQuery.of(context).size.height,
 
                     child: ListView.builder(
-                      itemCount: _vehicles.length,
+                      itemCount: _customers.length,
                       itemBuilder: (context, index) {
-                        final vehicle = _vehicles[index];
+                        final vehicle = _customers[index];
                         return Card(
                           color: Colors.white,
                           margin: const EdgeInsets.symmetric(vertical: 8.0),
@@ -265,8 +319,8 @@ class _VehicleScreenState extends State<VehicleScreen> {
           ),
         ),
       ),
-      drawer: const MyDrawer(),
+      drawer: MyDrawer(),
     );
-  }
 
+  }
 }

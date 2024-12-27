@@ -1,6 +1,6 @@
-import 'package:company_studio/auth/login_or_register.dart';
+
 import 'package:company_studio/file_service.dart';
-import 'package:company_studio/screens/home_screen.dart';
+import 'package:company_studio/screens/customers_and_balance.dart';
 import 'package:company_studio/screens/materials.dart';
 import 'package:company_studio/screens/orders_and_new_order.dart';
 import 'package:company_studio/screens/splash_screen.dart';
@@ -22,7 +22,8 @@ Future<void> main() async {
   final fileService = FileService();
 
   // Restore orders file on app launch after an update
-  await checkAndRestore(fileService);// Initialize Flutter Downloader
+  await checkAndRestore(fileService);
+  // Initialize Flutter Downloader
   runApp(
       ChangeNotifierProvider(
         create: (context)=> ThemeProvider(),
@@ -62,6 +63,7 @@ class MyApp extends StatelessWidget {
         '/home' : (context) => OrdersAndNewOrderScreen(),
         '/orders': (context) => const OrdersScreen(),
         '/profile': (context) => ProfileScreen(),
+        '/customer': (context) => CustomersAndBalanceScreen(),
         '/vehicle': (context) => VehicleScreen(),
         '/material' : (context) => const MaterialsScreen(),
       },
